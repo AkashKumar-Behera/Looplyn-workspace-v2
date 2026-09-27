@@ -12,8 +12,8 @@ RUN flutter pub get
 # Copy source files
 COPY . .
 
-# Pass API URL at build time (Defaults to production)
-ARG API_URL=https://api.looplyn.tech/api/v1
+# Pass API URL at build time (Pointing to new core.looplyn.tech backend)
+ARG API_URL=https://core.looplyn.tech/api/v1
 ENV API_URL=$API_URL
 
 # Compile optimized web bundle
