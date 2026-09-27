@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/api_client.dart';
 import '../../core/looplyn_logo.dart';
+import '../../core/route_transitions.dart';
 import 'forgot_password_screen.dart';
 import '../studio/studio_calendar_screen.dart';
 
@@ -42,7 +43,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (res['success'] == true) {
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const StudioCalendarScreen()),
+          SmoothPageRoute(
+            page: const StudioCalendarScreen(),
+            direction: SlideDirection.fadeOnly,
+          ),
         );
       } else {
         setState(() => _errorMessage = res['error'] ?? 'Login failed');
@@ -336,7 +340,10 @@ class _LoginScreenState extends State<LoginScreen> {
             child: GestureDetector(
               onTap: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                  SmoothPageRoute(
+                    page: const ForgotPasswordScreen(),
+                    direction: SlideDirection.rightToLeft,
+                  ),
                 );
               },
               child: const Text(
