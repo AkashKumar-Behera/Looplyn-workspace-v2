@@ -1,0 +1,233 @@
+name: Multi-Platform Build & Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release Tag Version (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  # -------------------------------------------------------------
+  # 1. Android APK Build
+  # -------------------------------------------------------------
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: client_app
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: client_app
+        run: |
+          flutter build apk --release \
+            --dart-define=API_URL=${{ secrets.API_URL || 'https://api.looplyn.tech/api/v1' }}
+
+      - name: Rename APK Asset
+        run: |
+          mkdir -p release-assets
+          cp client_app/build/app/outputs/flutter-apk/app-release.apk release-assets/Looplyn-Android.apk
+
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: looplyn-android-apk
+          path: release-assets/Looplyn-Android.apk
+
+  # -------------------------------------------------------------
+  # 2. Windows x64 Desktop Build
+  # -------------------------------------------------------------
+  build-windows:
+    name: Build Windows Desktop
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install Dependencies
+        working-directory: client_app
+        run: flutter pub get
+
+      - name: Build Windows
+        working-directory: client_app
+        run: |
+          flutter build windows --release `
+            --dart-define=API_URL="${{ secrets.API_URL || 'https://api.looplyn.tech/api/v1' }}"
+
+      - name: Package Windows Zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets
+          Compress-Archive -Path "client_app\build\windows\x64\runner\Release\*" -DestinationPath "release-assets\Looplyn-Windows-x64.zip" -Force
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: looplyn-windows-zip
+          path: release-assets\Looplyn-Windows-x64.zip
+
+  # -------------------------------------------------------------
+  # 3. macOS Desktop Build
+  # -------------------------------------------------------------
+  build-macos:
+    name: Build macOS App
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable macOS Desktop
+        run: flutter config --enable-macos-desktop
+
+      - name: Install Dependencies
+        working-directory: client_app
+        run: flutter pub get
+
+      - name: Build macOS
+        working-directory: client_app
+        run: |
+          flutter build macos --release \
+            --dart-define=API_URL=${{ secrets.API_URL || 'https://api.looplyn.tech/api/v1' }}
+
+      - name: Package macOS Zip
+        run: |
+          mkdir -p release-assets
+          cd client_app/build/macos/Build/Products/Release
+          zip -r -y ../../../../../../release-assets/Looplyn-macOS.zip Looplyn.app
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: looplyn-macos-zip
+          path: release-assets/Looplyn-macOS.zip
+
+  # -------------------------------------------------------------
+  # 4. Flutter Web Build & Dokploy Auto-Deploy
+  # -------------------------------------------------------------
+  build-web-and-deploy:
+    name: Build Web & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: client_app
+        run: flutter pub get
+
+      - name: Build Web
+        working-directory: client_app
+        run: |
+          flutter build web --release \
+            --dart-define=API_URL=${{ secrets.API_URL || 'https://api.looplyn.tech/api/v1' }}
+
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: looplyn-web-build
+          path: client_app/build/web/
+
+      - name: Trigger Dokploy Webhook Deploy
+        if: ${{ env.DOKPLOY_WEBHOOK_URL != '' }}
+        env:
+          DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+        run: |
+          echo "Triggering Dokploy Webhook deployment..."
+          curl -X POST "$DOKPLOY_WEBHOOK_URL" || echo "Webhook trigger completed"
+
+  # -------------------------------------------------------------
+  # 5. Publish Multi-Platform GitHub Release
+  # -------------------------------------------------------------
+  publish-release:
+    name: Publish Release Assets
+    needs: [build-android, build-windows, build-macos, build-web-and-deploy]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: looplyn-android-apk
+          path: final-release/
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: looplyn-windows-zip
+          path: final-release/
+
+      - name: Download macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: looplyn-macos-zip
+          path: final-release/
+
+      - name: Determine Release Tag
+        id: tag_name
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "TAG=${{ github.event.inputs.release_tag }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_name.outputs.TAG }}
+          name: "Looplyn Workspace Release ${{ steps.tag_name.outputs.TAG }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            final-release/Looplyn-Android.apk
+            final-release/Looplyn-Windows-x64.zip
+            final-release/Looplyn-macOS.zip

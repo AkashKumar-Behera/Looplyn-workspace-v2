@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+package-lock.json
+
+# Environment Variables & Secrets
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.cert
+*.jks
+*.keystore
+
+# Flutter & Dart
+client_app/.dart_tool/
+client_app/.pub-cache/
+client_app/.pub/
+client_app/build/
+client_app/.flutter-plugins
+client_app/.flutter-plugins-dependencies
+client_app/ios/Pods/
+client_app/ios/.symlinks/
+client_app/ios/Flutter/Flutter.framework
+client_app/ios/Flutter/Flutter.podspec
+client_app/android/.gradle/
+client_app/android/app/build/
+
+# Server Build Artifacts
+server/dist/
+server/.cache/
+server/coverage/
+
+# OS & IDE Files
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+.idea/
+.vscode/
+*.swp
+localhost

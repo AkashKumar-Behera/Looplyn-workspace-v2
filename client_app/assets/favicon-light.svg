@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- Background Red Ambient Blur -->
+    <filter id="bg-red-glow-light" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="50" />
+    </filter>
+    <!-- Foreground Red Shape Neon Glow -->
+    <filter id="red-shape-glow-light" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="#dc2626" flood-opacity="0.8"/>
+    </filter>
+  </defs>
+
+  <!-- Soft Ambient Red Blurred Background Halo -->
+  <circle cx="256" cy="256" r="160" fill="#dc2626" opacity="0.3" filter="url(#bg-red-glow-light)" />
+
+  <g transform="translate(64, 64) scale(0.75)">
+    <!-- Bottom right wide card - slate gray -->
+    <path fill="#52525b" d="m497 362h-280c-8.284 0-15 6.716-15 15v120c0 8.284 6.716 15 15 15h280c8.284 0 15-6.716 15-15v-120c0-8.284-6.716-15-15-15z"/>
+    <!-- Bottom left card - Glowing Red -->
+    <path fill="#dc2626" filter="url(#red-shape-glow-light)" d="m155 362h-140c-8.284 0-15 6.716-15 15v120c0 8.284 6.716 15 15 15h140c8.284 0 15-6.716 15-15v-120c0-8.284-6.716-15-15-15z"/>
+    <!-- Main left tall card - Pure Black -->
+    <path fill="#000000" d="m15 332h210c8.284 0 15-6.716 15-15v-302c0-8.284-6.716-15-15-15h-210c-8.284 0-15 6.716-15 15v302c0 8.284 6.716 15 15 15z"/>
+    <!-- Top right slashed block - Glowing Red -->
+    <path fill="#dc2626" filter="url(#red-shape-glow-light)" d="m497 0h-210c-8.284 0-15 6.716-15 15v180.662l240-91.428v-89.234c0-8.284-6.716-15-15-15z"/>
+    <!-- Middle right slashed block - Pure Black -->
+    <path fill="#000000" d="m272 317c0 8.284 6.716 15 15 15h210c8.284 0 15-6.716 15-15v-180.662l-240 91.428z"/>
+  </g>
+</svg>
