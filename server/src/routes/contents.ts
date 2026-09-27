@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { query } from '../db'
-import { authMiddleware, requireRoles, UserPayload } from '../middleware/auth'
+import { authMiddleware, requireRoles, UserPayload, AuthEnv } from '../middleware/auth'
 
-const contentRoutes = new Hono()
+const contentRoutes = new Hono<AuthEnv>()
 
 // Apply Auth to all content endpoints
 contentRoutes.use('*', authMiddleware)

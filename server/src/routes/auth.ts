@@ -3,9 +3,9 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { query } from '../db'
-import { authMiddleware, requireRoles, UserPayload } from '../middleware/auth'
+import { authMiddleware, requireRoles, UserPayload, AuthEnv } from '../middleware/auth'
 
-const authRoutes = new Hono()
+const authRoutes = new Hono<AuthEnv>()
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_looplyn_jwt_2026_key_production'
 
 // 1. Login Endpoint

@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { query } from '../db'
-import { authMiddleware, requireRoles, UserPayload } from '../middleware/auth'
+import { authMiddleware, requireRoles, UserPayload, AuthEnv } from '../middleware/auth'
 
-const chatRoutes = new Hono()
+const chatRoutes = new Hono<AuthEnv>()
 
 // Apply Auth to all chat routes
 chatRoutes.use('*', authMiddleware)

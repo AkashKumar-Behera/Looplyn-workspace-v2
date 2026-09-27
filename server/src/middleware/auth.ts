@@ -11,7 +11,13 @@ export interface UserPayload {
   clientId?: string
 }
 
-export const authMiddleware = async (c: Context, next: Next) => {
+export type AuthEnv = {
+  Variables: {
+    user: UserPayload
+  }
+}
+
+export const authMiddleware = async (c: Context<AuthEnv>, next: Next) => {
   const authHeader = c.req.header('Authorization')
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -30,8 +36,8 @@ export const authMiddleware = async (c: Context, next: Next) => {
 }
 
 export const requireRoles = (...allowedRoles: string[]) => {
-  return async (c: Context, next: Next) => {
-    const user = c.get('user') as UserPayload | undefined
+  return async (c: Context<AuthEnv>, next: Next) => {
+    const user = c.get('user')
     if (!user || !allowedRoles.includes(user.role)) {
       return c.json({ success: false, error: 'Forbidden: Insufficient role permissions' }, 403)
     }
