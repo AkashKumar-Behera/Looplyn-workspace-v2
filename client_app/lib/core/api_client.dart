@@ -2,7 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://localhost:5000/api/v1';
+  static const String baseUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'http://localhost:5000/api/v1',
+  );
   final Dio dio = Dio(BaseOptions(
     baseUrl: baseUrl,
     connectTimeout: const Duration(seconds: 10),
