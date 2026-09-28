@@ -231,7 +231,7 @@ class _ClientsStaffScreenState extends State<ClientsStaffScreen> {
                               isSubmitting = false;
                             });
                           }
-                        } catch (err: any) {
+                        } catch (err) {
                           setDialogState(() {
                             dialogError = 'Error creating client. Check network connection.';
                             isSubmitting = false;
