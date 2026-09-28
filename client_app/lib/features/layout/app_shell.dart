@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/looplyn_logo.dart';
 import '../../core/route_transitions.dart';
+import '../../core/theme.dart';
 import '../auth/login_screen.dart';
 import '../chat/chat_hub_screen.dart';
 import '../clients/clients_staff_screen.dart';
@@ -25,7 +26,7 @@ class _AppShellState extends State<AppShell> {
   late int _currentTab;
   final _api = ApiClient();
   String _userName = 'Akash';
-  String _userEmail = 'admin@looplyn.tech';
+  String _userEmail = 'akashkumar48874@gmail.com';
   String _userRole = 'admin';
 
   @override
@@ -41,8 +42,8 @@ class _AppShellState extends State<AppShell> {
       if (res['success'] == true && res['user'] != null) {
         if (mounted) {
           setState(() {
-            _userName = res['user']['name'] ?? 'Admin';
-            _userEmail = res['user']['email'] ?? 'admin@looplyn.tech';
+            _userName = res['user']['name'] ?? 'Akash';
+            _userEmail = res['user']['email'] ?? 'akashkumar48874@gmail.com';
             _userRole = res['user']['role'] ?? 'admin';
           });
         }
@@ -63,6 +64,7 @@ class _AppShellState extends State<AppShell> {
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
+    if (hour >= 22 || hour < 5) return "It's quite late, $_userName";
     if (hour < 12) return 'Good morning, $_userName';
     if (hour < 17) return 'Good afternoon, $_userName';
     return 'Good evening, $_userName';
@@ -104,33 +106,40 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF070709),
-      body: Row(
-        children: [
-          // 1. Sidebar Navigation (Left)
-          _buildSidebar(),
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        final isDark = ThemeController.instance.isDark;
 
-          // 2. Main Workspace (Header + Dynamic Page Content)
-          Expanded(
-            child: Column(
-              children: [
-                _buildHeader(),
-                Expanded(child: _buildBody()),
-              ],
-            ),
+        return Scaffold(
+          backgroundColor: AppColors.bg(isDark),
+          body: Row(
+            children: [
+              // 1. Sidebar Navigation (Left)
+              _buildSidebar(isDark),
+
+              // 2. Main Workspace (Header + Dynamic Page Content)
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildHeader(isDark),
+                    Expanded(child: _buildBody()),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildSidebar() {
+  Widget _buildSidebar(bool isDark) {
     return Container(
       width: 230,
       decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0E),
-        border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+        color: AppColors.sidebar(isDark),
+        border: Border(right: BorderSide(color: AppColors.border(isDark))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,15 +152,15 @@ class _AppShellState extends State<AppShell> {
                 const LooplynLogo(size: 26),
                 const SizedBox(width: 10),
                 RichText(
-                  text: const TextSpan(
+                  text: TextSpan(
                     text: 'Looplyn',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      color: AppColors.textPrimary(isDark),
                       letterSpacing: -0.5,
                     ),
-                    children: [
+                    children: const [
                       TextSpan(
                         text: '▪',
                         style: TextStyle(color: Color(0xFFDC2626), fontSize: 18),
@@ -169,17 +178,24 @@ class _AppShellState extends State<AppShell> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF121217),
+                color: isDark ? const Color(0xFF121217) : const Color(0xFFF3F4F6),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                border: Border.all(color: AppColors.border(isDark)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.search, size: 15, color: Color(0xFF71717A)),
-                  SizedBox(width: 8),
-                  Text('Search', style: TextStyle(color: Color(0xFF52525B), fontSize: 12)),
-                  Spacer(),
-                  Text('⌘K', style: TextStyle(color: Color(0xFF52525B), fontSize: 10, fontFamily: 'monospace')),
+                  Icon(Icons.search, size: 15, color: AppColors.textMuted(isDark)),
+                  const SizedBox(width: 8),
+                  Text('Search', style: TextStyle(color: AppColors.textMuted(isDark), fontSize: 12)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E1E24) : const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text('⌘K', style: TextStyle(color: AppColors.textMuted(isDark), fontSize: 10, fontFamily: 'monospace')),
+                  ),
                 ],
               ),
             ),
@@ -191,28 +207,73 @@ class _AppShellState extends State<AppShell> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               children: [
-                _buildNavItem(0, 'Dashboard', Icons.dashboard_outlined),
-                _buildNavItem(1, 'Content Calendar', Icons.calendar_month_outlined),
-                _buildNavItem(2, 'Messages', Icons.chat_bubble_outline_rounded),
-                _buildNavItem(3, 'Tasks Board', Icons.check_circle_outline_rounded),
-                _buildNavItem(4, 'Files & Drive', Icons.folder_outlined),
-                _buildNavItem(5, 'Client & Staff', Icons.group_outlined),
-                _buildNavItem(6, 'Email Engine', Icons.mail_outline_rounded),
-                _buildNavItem(7, 'Trash Pool', Icons.delete_outline_rounded),
-                _buildNavItem(8, 'Settings', Icons.settings_outlined),
+                _buildNavItem(0, 'Dashboard', Icons.dashboard_outlined, isDark),
+                _buildNavItem(1, 'Content Calendar', Icons.calendar_month_outlined, isDark),
+                _buildNavItem(2, 'Messages', Icons.chat_bubble_outline_rounded, isDark),
+                _buildNavItem(3, 'Tasks', Icons.check_circle_outline_rounded, isDark),
+                _buildNavItem(4, 'Files', Icons.folder_outlined, isDark),
+                _buildNavItem(5, 'Client & Staff', Icons.group_outlined, isDark),
+                _buildNavItem(6, 'Emails', Icons.mail_outline_rounded, isDark),
+                _buildNavItem(7, 'Trash', Icons.delete_outline_rounded, isDark),
+                _buildNavItem(8, 'Settings', Icons.settings_outlined, isDark),
               ],
+            ),
+          ),
+
+          // Storage widget matching legacy Screenshot 5
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF101015) : const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border(isDark)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.cloud_outlined, size: 14, color: Color(0xFF3B82F6)),
+                          const SizedBox(width: 6),
+                          Text('Storage', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textPrimary(isDark))),
+                        ],
+                      ),
+                      Text('2.1% used', style: TextStyle(fontSize: 10, color: AppColors.textMuted(isDark), fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: const LinearProgressIndicator(
+                      value: 0.021,
+                      backgroundColor: Color(0xFF272730),
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDC2626)),
+                      minHeight: 4,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text('407 files • 46.6 GB of 2TB', style: TextStyle(fontSize: 9, color: AppColors.textMuted(isDark))),
+                ],
+              ),
             ),
           ),
 
           // Sidebar Footer
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+              border: Border(top: BorderSide(color: AppColors.border(isDark))),
             ),
             child: Column(
               children: [
-                _buildFooterItem('Sign Out', Icons.logout_rounded, _handleLogout, isDanger: true),
+                _buildFooterItem('Feedback & Bugs', Icons.bug_report_outlined, () {}, isDark),
+                const SizedBox(height: 4),
+                _buildFooterItem('Sign Out', Icons.logout_rounded, _handleLogout, isDark, isDanger: true),
               ],
             ),
           ),
@@ -221,7 +282,7 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  Widget _buildNavItem(int index, String label, IconData icon) {
+  Widget _buildNavItem(int index, String label, IconData icon, bool isDark) {
     final isSelected = _currentTab == index;
     return Container(
       margin: const EdgeInsets.only(bottom: 3),
@@ -233,7 +294,9 @@ class _AppShellState extends State<AppShell> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFF1C1315) : Colors.transparent,
+              color: isSelected
+                  ? (isDark ? const Color(0xFF1C1315) : const Color(0xFFFEE2E2))
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
               border: isSelected
                   ? Border.all(color: const Color(0xFFDC2626).withValues(alpha: 0.35))
@@ -244,7 +307,7 @@ class _AppShellState extends State<AppShell> {
                 Icon(
                   icon,
                   size: 16,
-                  color: isSelected ? const Color(0xFFEF4444) : const Color(0xFF71717A),
+                  color: isSelected ? const Color(0xFFEF4444) : AppColors.textMuted(isDark),
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -252,7 +315,9 @@ class _AppShellState extends State<AppShell> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                    color: isSelected ? Colors.white : const Color(0xFF9CA3AF),
+                    color: isSelected
+                        ? (isDark ? Colors.white : const Color(0xFFDC2626))
+                        : AppColors.textSecondary(isDark),
                   ),
                 ),
               ],
@@ -263,7 +328,7 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  Widget _buildFooterItem(String label, IconData icon, VoidCallback onTap, {bool isDanger = false}) {
+  Widget _buildFooterItem(String label, IconData icon, VoidCallback onTap, bool isDark, {bool isDanger = false}) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -276,14 +341,14 @@ class _AppShellState extends State<AppShell> {
               Icon(
                 icon,
                 size: 15,
-                color: isDanger ? const Color(0xFFEF4444) : const Color(0xFF71717A),
+                color: isDanger ? const Color(0xFFEF4444) : AppColors.textMuted(isDark),
               ),
               const SizedBox(width: 12),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: isDanger ? const Color(0xFFEF4444) : const Color(0xFF71717A),
+                  color: isDanger ? const Color(0xFFEF4444) : AppColors.textMuted(isDark),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -294,12 +359,12 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0E),
-        border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+        color: AppColors.sidebar(isDark),
+        border: Border(bottom: BorderSide(color: AppColors.border(isDark))),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -310,20 +375,20 @@ class _AppShellState extends State<AppShell> {
             children: [
               Text(
                 _getGreeting(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  color: AppColors.textPrimary(isDark),
                   letterSpacing: -0.4,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 _currentTab == 0 ? 'OVERVIEW FOR TODAY' : _getDateSubtitle(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF71717A),
+                  color: AppColors.textMuted(isDark),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -333,27 +398,50 @@ class _AppShellState extends State<AppShell> {
           // Header Controls
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF181820),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              // Theme Toggle Button (Sun / Moon)
+              IconButton(
+                icon: Icon(
+                  isDark ? Icons.wb_sunny_outlined : Icons.dark_mode_outlined,
+                  size: 18,
+                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
                 ),
-                child: Text(
-                  _userRole.toUpperCase(),
-                  style: const TextStyle(color: Color(0xFFDC2626), fontSize: 10, fontWeight: FontWeight.bold),
-                ),
+                tooltip: isDark ? 'Switch to Light mode' : 'Switch to Dark Noir mode',
+                onPressed: () => ThemeController.instance.toggleTheme(),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 4),
+
+              // Filter Controls
+              IconButton(
+                icon: Icon(Icons.tune_rounded, size: 18, color: AppColors.textMuted(isDark)),
+                tooltip: 'Filter options',
+                onPressed: () {},
+              ),
+              const SizedBox(width: 4),
+
+              // Notifications Bell
+              IconButton(
+                icon: Icon(Icons.notifications_none_rounded, size: 19, color: AppColors.textMuted(isDark)),
+                tooltip: 'Notifications',
+                onPressed: () {},
+              ),
+              const SizedBox(width: 12),
+
+              // User Avatar
               Tooltip(
-                message: _userEmail,
-                child: CircleAvatar(
-                  radius: 17,
-                  backgroundColor: const Color(0xFFC0151C),
-                  child: Text(
-                    _userName.isNotEmpty ? _userName[0].toUpperCase() : 'A',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                message: '$_userName ($_userRole) • $_userEmail',
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFC0151C),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1.5),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _userName.isNotEmpty ? _userName[0].toUpperCase() : 'A',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                    ),
                   ),
                 ),
               ),

@@ -6,8 +6,9 @@ import 'features/auth/login_screen.dart';
 import 'features/client/client_review_screen.dart';
 import 'features/layout/app_shell.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ThemeController.instance.init();
   runApp(const LooplynApp());
 }
 
@@ -16,13 +17,18 @@ class LooplynApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Looplyn Workspace',
-      debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
-      theme: AppTheme.darkTheme,
-      darkTheme: AppTheme.darkTheme,
-      home: const AuthGate(),
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Looplyn Workspace',
+          debugShowCheckedModeBanner: false,
+          themeMode: ThemeController.instance.themeMode,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          home: const AuthGate(),
+        );
+      },
     );
   }
 }
@@ -63,9 +69,6 @@ class _AuthGateState extends State<AuthGate> {
         } else {
           _targetScreen = const AppShell();
         }
-      } else {
-        await _api.logout();
-        _targetScreen = const LoginScreen();
       }
     } catch (_) {
       _targetScreen = const LoginScreen();
@@ -79,10 +82,11 @@ class _AuthGateState extends State<AuthGate> {
   @override
   Widget build(BuildContext context) {
     if (_isChecking) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF070709),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFC0151C)),
+      final isDark = ThemeController.instance.isDark;
+      return Scaffold(
+        backgroundColor: AppColors.bg(isDark),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.accentRed),
         ),
       );
     }
