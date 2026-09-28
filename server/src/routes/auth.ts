@@ -87,7 +87,8 @@ authRoutes.post('/login', async (c) => {
       email: user.email,
       role: user.role,
       name: user.name,
-      clientId: user.client_id
+      clientId: user.client_id,
+      avatarUrl: user.avatar_url
     }
 
     const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '30d' })

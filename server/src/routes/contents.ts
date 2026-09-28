@@ -7,18 +7,20 @@ const contentRoutes = new Hono<AuthEnv>()
 // Apply Auth to all content endpoints
 contentRoutes.use('*', authMiddleware)
 
-// 1. List Contents / Calendar Posts (with RBAC isolation)
+// 1. List Contents / Calendar Posts (with RBAC isolation and soft-delete filtering)
 contentRoutes.get('/', async (c) => {
   const user = c.get('user') as UserPayload
   const clientId = c.req.query('client_id')
   const status = c.req.query('status')
   const platform = c.req.query('platform')
+  const includeDeleted = c.req.query('include_deleted') === 'true'
 
   try {
     let sql = `
       SELECT 
         c.id, c.title, c.description, c.platform, c.format, c.status, 
-        c.priority, c.scheduled_date, c.media_urls, c.caption, c.created_at,
+        c.priority, c.scheduled_date, c.media_urls, c.caption, c.client_feedback,
+        c.deleted_at, c.created_at, c.updated_at,
         cl.id AS client_id, cl.name AS client_name, cl.logo_url AS client_logo,
         u.id AS staff_id, u.name AS staff_name, u.avatar_url AS staff_avatar
       FROM contents c
@@ -27,6 +29,10 @@ contentRoutes.get('/', async (c) => {
       WHERE 1=1
     `
     const params: any[] = []
+
+    if (!includeDeleted) {
+      sql += ` AND c.deleted_at IS NULL`
+    }
 
     // Strict Client Isolation: If logged in as client, only show their client_id
     if (user.role === 'client') {
@@ -97,6 +103,7 @@ contentRoutes.get('/:id', async (c) => {
 
 // 3. Create Content Item (Admin & Staff)
 contentRoutes.post('/', requireRoles('admin', 'staff', 'super_admin'), async (c) => {
+  const user = c.get('user') as UserPayload
   try {
     const {
       title,
@@ -137,6 +144,13 @@ contentRoutes.post('/', requireRoles('admin', 'staff', 'super_admin'), async (c)
       ]
     )
 
+    // Log Activity
+    await query(
+      `INSERT INTO activity_logs (user_id, user_name, action, entity_type, entity_id, entity_title)
+       VALUES ($1, $2, 'created post', 'content', $3, $4)`,
+      [user.id, user.name || 'User', res.rows[0].id, title.trim()]
+    )
+
     return c.json({ success: true, message: 'Content created successfully', content: res.rows[0] })
   } catch (err) {
     console.error('Create content error:', err)
@@ -157,7 +171,7 @@ const handleUpdateContent = async (c: any) => {
     const allowedUpdates = [
       'title', 'description', 'client_id', 'platform', 'format', 
       'status', 'priority', 'assigned_staff_id', 'scheduled_date', 
-      'media_urls', 'caption'
+      'media_urls', 'caption', 'client_feedback'
     ]
 
     for (const key of allowedUpdates) {
@@ -194,6 +208,15 @@ const handleUpdateContent = async (c: any) => {
       return c.json({ success: false, error: 'Content item not found' }, 404)
     }
 
+    // Log Activity on Status Change
+    if (body.status) {
+      await query(
+        `INSERT INTO activity_logs (user_id, user_name, action, entity_type, entity_id, entity_title)
+         VALUES ($1, $2, $3, 'content', $4, $5)`,
+        [user.id, user.name || 'User', `changed status to ${body.status}`, id, res.rows[0].title]
+      )
+    }
+
     return c.json({ success: true, message: 'Content updated successfully', content: res.rows[0] })
   } catch (err) {
     console.error('Update content error:', err)
@@ -222,11 +245,16 @@ contentRoutes.post('/:id/approve', async (c) => {
       return c.json({ success: false, error: 'Content item not found' }, 404)
     }
 
-    // Optional: Auto log approval comment
     await query(
       `INSERT INTO content_comments (content_id, author_id, comment)
        VALUES ($1, $2, '✅ Approved the content')`,
       [id, user.id]
+    )
+
+    await query(
+      `INSERT INTO activity_logs (user_id, user_name, action, entity_type, entity_id, entity_title)
+       VALUES ($1, $2, 'approved creative draft', 'content', $3, $4)`,
+      [user.id, user.name || 'Client', id, res.rows[0].title]
     )
 
     return c.json({ success: true, message: 'Content approved successfully!', content: res.rows[0] })
@@ -245,10 +273,10 @@ contentRoutes.post('/:id/request-changes', async (c) => {
   try {
     const res = await query(
       `UPDATE contents 
-       SET status = 'IN_PROGRESS', updated_at = NOW() 
+       SET status = 'IN_PROGRESS', client_feedback = $2, updated_at = NOW() 
        WHERE id = $1 
        RETURNING *`,
-      [id]
+      [id, feedback || '']
     )
 
     if (res.rows.length === 0) {
@@ -262,6 +290,12 @@ contentRoutes.post('/:id/request-changes', async (c) => {
         [id, user.id, `❌ Changes Requested: ${feedback.trim()}`]
       )
     }
+
+    await query(
+      `INSERT INTO activity_logs (user_id, user_name, action, entity_type, entity_id, entity_title)
+       VALUES ($1, $2, 'requested changes on', 'content', $3, $4)`,
+      [user.id, user.name || 'Client', id, res.rows[0].title]
+    )
 
     return c.json({ success: true, message: 'Changes requested successfully', content: res.rows[0] })
   } catch (err) {
@@ -314,15 +348,25 @@ contentRoutes.post('/:id/comments', async (c) => {
   }
 })
 
-// 9. Delete Content Item (Admin Only)
-contentRoutes.delete('/:id', requireRoles('admin', 'super_admin'), async (c) => {
+// 9. Soft Delete / Permanent Delete Content Item
+contentRoutes.delete('/:id', requireRoles('admin', 'staff', 'super_admin'), async (c) => {
   const id = c.req.param('id')
+  const isPermanent = c.req.query('permanent') === 'true'
+
   try {
-    const res = await query('DELETE FROM contents WHERE id = $1 RETURNING id', [id])
-    if (res.rows.length === 0) {
-      return c.json({ success: false, error: 'Content item not found' }, 404)
+    if (isPermanent) {
+      const res = await query('DELETE FROM contents WHERE id = $1 RETURNING id', [id])
+      if (res.rows.length === 0) {
+        return c.json({ success: false, error: 'Content item not found' }, 404)
+      }
+      return c.json({ success: true, message: 'Content item permanently deleted' })
+    } else {
+      const res = await query('UPDATE contents SET deleted_at = NOW() WHERE id = $1 RETURNING id', [id])
+      if (res.rows.length === 0) {
+        return c.json({ success: false, error: 'Content item not found' }, 404)
+      }
+      return c.json({ success: true, message: 'Content moved to trash' })
     }
-    return c.json({ success: true, message: 'Content item deleted' })
   } catch (err) {
     return c.json({ success: false, error: 'Failed to delete content' }, 500)
   }

@@ -7,7 +7,10 @@ import '../chat/chat_hub_screen.dart';
 import '../clients/clients_staff_screen.dart';
 import '../dashboard/studio_dashboard_screen.dart';
 import '../emails/email_templates_screen.dart';
+import '../files/files_storage_screen.dart';
+import '../settings/workspace_settings_screen.dart';
 import '../studio/studio_calendar_screen.dart';
+import '../tasks/tasks_board_screen.dart';
 import '../trash/trash_screen.dart';
 
 class AppShell extends StatefulWidget {
@@ -83,9 +86,9 @@ class _AppShellState extends State<AppShell> {
       case 2:
         return const ChatHubScreen();
       case 3:
-        return _buildPlaceholderScreen('Tasks Board', 'Track and assign creative workflows, approvals, and deadlines.', Icons.check_circle_outline_rounded);
+        return const TasksBoardScreen();
       case 4:
-        return _buildPlaceholderScreen('Asset Library & Files', 'Organize video drafts, reels, PSDs, and brand collateral.', Icons.folder_outlined);
+        return const FilesStorageScreen();
       case 5:
         return const ClientsStaffScreen();
       case 6:
@@ -93,46 +96,10 @@ class _AppShellState extends State<AppShell> {
       case 7:
         return const TrashScreen();
       case 8:
-        return _buildPlaceholderScreen('Workspace Settings', 'Configure studio preferences, members, roles, and integrations.', Icons.settings_outlined);
+        return const WorkspaceSettingsScreen();
       default:
         return const StudioDashboardScreen();
     }
-  }
-
-  Widget _buildPlaceholderScreen(String title, String subtitle, IconData icon) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF181820),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-              ),
-              child: Icon(icon, size: 36, color: const Color(0xFFDC2626)),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white),
-            ),
-            const SizedBox(height: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF71717A)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
@@ -227,11 +194,11 @@ class _AppShellState extends State<AppShell> {
                 _buildNavItem(0, 'Dashboard', Icons.dashboard_outlined),
                 _buildNavItem(1, 'Content Calendar', Icons.calendar_month_outlined),
                 _buildNavItem(2, 'Messages', Icons.chat_bubble_outline_rounded),
-                _buildNavItem(3, 'Tasks', Icons.check_circle_outline_rounded),
-                _buildNavItem(4, 'Files', Icons.folder_outlined),
+                _buildNavItem(3, 'Tasks Board', Icons.check_circle_outline_rounded),
+                _buildNavItem(4, 'Files & Drive', Icons.folder_outlined),
                 _buildNavItem(5, 'Client & Staff', Icons.group_outlined),
-                _buildNavItem(6, 'Emails', Icons.mail_outline_rounded),
-                _buildNavItem(7, 'Trash', Icons.delete_outline_rounded),
+                _buildNavItem(6, 'Email Engine', Icons.mail_outline_rounded),
+                _buildNavItem(7, 'Trash Pool', Icons.delete_outline_rounded),
                 _buildNavItem(8, 'Settings', Icons.settings_outlined),
               ],
             ),
@@ -245,8 +212,6 @@ class _AppShellState extends State<AppShell> {
             ),
             child: Column(
               children: [
-                _buildFooterItem('Feedback & Bugs', Icons.bug_report_outlined, () {}),
-                const SizedBox(height: 4),
                 _buildFooterItem('Sign Out', Icons.logout_rounded, _handleLogout, isDanger: true),
               ],
             ),
@@ -368,29 +333,28 @@ class _AppShellState extends State<AppShell> {
           // Header Controls
           Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.wb_sunny_outlined, size: 17, color: Color(0xFF71717A)),
-                onPressed: () {},
-                tooltip: 'Theme toggle',
-              ),
-              IconButton(
-                icon: const Icon(Icons.tune_rounded, size: 17, color: Color(0xFF71717A)),
-                onPressed: () {},
-                tooltip: 'Filter options',
-              ),
-              IconButton(
-                icon: const Icon(Icons.notifications_none_rounded, size: 18, color: Color(0xFF71717A)),
-                onPressed: () {},
-                tooltip: 'Notifications',
-              ),
-              const SizedBox(width: 8),
-              // User Avatar
-              CircleAvatar(
-                radius: 17,
-                backgroundColor: const Color(0xFFC0151C),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF181820),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
                 child: Text(
-                  _userName.isNotEmpty ? _userName[0].toUpperCase() : 'A',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                  _userRole.toUpperCase(),
+                  style: const TextStyle(color: Color(0xFFDC2626), fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Tooltip(
+                message: _userEmail,
+                child: CircleAvatar(
+                  radius: 17,
+                  backgroundColor: const Color(0xFFC0151C),
+                  child: Text(
+                    _userName.isNotEmpty ? _userName[0].toUpperCase() : 'A',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
                 ),
               ),
             ],

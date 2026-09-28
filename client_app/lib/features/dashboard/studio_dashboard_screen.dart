@@ -11,8 +11,10 @@ class StudioDashboardScreen extends StatefulWidget {
 
 class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
   final _api = ApiClient();
-  bool _isLoading = false;
+  bool _isLoading = true;
   List<dynamic> _contents = [];
+  List<dynamic> _activities = [];
+  List<dynamic> _activityStats = [];
 
   @override
   void initState() {
@@ -23,10 +25,17 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
   Future<void> _fetchDashboardData() async {
     setState(() => _isLoading = true);
     try {
-      final items = await _api.getContents();
+      final results = await Future.wait([
+        _api.getContents(),
+        _api.getActivities(),
+        _api.getActivityStats(),
+      ]);
+
       if (mounted) {
         setState(() {
-          _contents = items;
+          _contents = results[0];
+          _activities = results[1];
+          _activityStats = results[2];
           _isLoading = false;
         });
       }
@@ -34,6 +43,21 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  String _formatRelativeTime(String? dateStr) {
+    if (dateStr == null) return 'recently';
+    try {
+      final dt = DateTime.parse(dateStr).toLocal();
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) return 'just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      if (diff.inDays < 7) return '${diff.inDays}d ago';
+      return '${dt.day}/${dt.month}';
+    } catch (_) {
+      return 'recently';
     }
   }
 
@@ -45,9 +69,50 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
       );
     }
 
-    final awaitingReview = _contents.where((c) => c['status'] == 'REVIEW' || c['status'] == 'in_review').length;
-    final atRisk = _contents.where((c) => c['is_overdue'] == true || c['status'] == 'OVERDUE' || c['status'] == 'at_risk').length;
-    final totalPosts = _contents.length;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final in3Days = today.add(const Duration(days: 3));
+
+    // Calculate real dynamic metric values
+    final awaitingReview = _contents.where((c) {
+      final status = (c['status'] ?? '').toString().toUpperCase();
+      return status == 'REVIEW' || status == 'IN_REVIEW';
+    }).length;
+
+    final atRisk = _contents.where((c) {
+      final status = (c['status'] ?? '').toString().toUpperCase();
+      if (status == 'PUBLISHED' || status == 'APPROVED') return false;
+      if (c['scheduled_date'] == null) return false;
+      try {
+        final sched = DateTime.parse(c['scheduled_date']).toLocal();
+        final schedDay = DateTime(sched.year, sched.month, sched.day);
+        return schedDay.isBefore(today) || schedDay.isBefore(today.add(const Duration(days: 2)));
+      } catch (_) {
+        return false;
+      }
+    }).length;
+
+    final withClientOver48h = _contents.where((c) {
+      final status = (c['status'] ?? '').toString().toUpperCase();
+      if (status != 'REVIEW' && status != 'IN_REVIEW') return false;
+      try {
+        final created = DateTime.parse(c['created_at']);
+        return now.difference(created).inHours >= 48;
+      } catch (_) {
+        return false;
+      }
+    }).length;
+
+    final publishingNext3Days = _contents.where((c) {
+      if (c['scheduled_date'] == null) return false;
+      try {
+        final sched = DateTime.parse(c['scheduled_date']).toLocal();
+        final schedDay = DateTime(sched.year, sched.month, sched.day);
+        return !schedDay.isBefore(today) && !schedDay.isAfter(in3Days);
+      } catch (_) {
+        return false;
+      }
+    }).length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
@@ -58,99 +123,62 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
           LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth > 900;
-              return isWide
-                  ? Row(
-                      children: [
-                        Expanded(child: _buildMetricCard(
-                          title: 'AWAITING MY REVIEW',
-                          value: '${awaitingReview > 0 ? awaitingReview : 13}',
-                          subtitle: 'Only you unblock these',
-                          icon: Icons.chat_bubble_outline_rounded,
-                          highlightColor: const Color(0xFF3B82F6),
-                        )),
-                        const SizedBox(width: 14),
-                        Expanded(child: _buildMetricCard(
-                          title: 'AT RISK',
-                          value: '${atRisk > 0 ? atRisk : 20}',
-                          subtitle: 'Live in ≤2 days, not past gate 1',
-                          icon: Icons.error_outline_rounded,
-                          highlightColor: const Color(0xFFDC2626),
-                          isAlert: true,
-                        )),
-                        const SizedBox(width: 14),
-                        Expanded(child: _buildMetricCard(
-                          title: 'WITH CLIENT >48 HRS',
-                          value: '0',
-                          subtitle: 'Backup approver fires',
-                          icon: Icons.group_outlined,
-                          highlightColor: const Color(0xFF6B7280),
-                        )),
-                        const SizedBox(width: 14),
-                        Expanded(child: _buildMetricCard(
-                          title: 'UNANSWERED COMMENTS',
-                          value: '0',
-                          subtitle: 'Your 4-hour SLA',
-                          icon: Icons.chat_outlined,
-                          highlightColor: const Color(0xFFDC2626),
-                          hasBadge: true,
-                        )),
-                        const SizedBox(width: 14),
-                        Expanded(child: _buildMetricCard(
-                          title: 'PUBLISHING NEXT 3 DAYS',
-                          value: '2',
-                          subtitle: 'Manual posting queue',
-                          icon: Icons.rocket_launch_outlined,
-                          highlightColor: const Color(0xFF10B981),
-                        )),
-                      ],
-                    )
-                  : Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        SizedBox(
-                          width: (constraints.maxWidth - 12) / 2,
-                          child: _buildMetricCard(
-                            title: 'AWAITING MY REVIEW',
-                            value: '${awaitingReview > 0 ? awaitingReview : 13}',
-                            subtitle: 'Only you unblock these',
-                            icon: Icons.chat_bubble_outline_rounded,
-                            highlightColor: const Color(0xFF3B82F6),
-                          ),
-                        ),
-                        SizedBox(
-                          width: (constraints.maxWidth - 12) / 2,
-                          child: _buildMetricCard(
-                            title: 'AT RISK',
-                            value: '${atRisk > 0 ? atRisk : 20}',
-                            subtitle: 'Live in ≤2 days, not past gate 1',
-                            icon: Icons.error_outline_rounded,
-                            highlightColor: const Color(0xFFDC2626),
-                            isAlert: true,
-                          ),
-                        ),
-                        SizedBox(
-                          width: (constraints.maxWidth - 12) / 2,
-                          child: _buildMetricCard(
-                            title: 'WITH CLIENT >48 HRS',
-                            value: '0',
-                            subtitle: 'Backup approver fires',
-                            icon: Icons.group_outlined,
-                            highlightColor: const Color(0xFF6B7280),
-                          ),
-                        ),
-                        SizedBox(
-                          width: (constraints.maxWidth - 12) / 2,
-                          child: _buildMetricCard(
-                            title: 'PUBLISHING NEXT 3 DAYS',
-                            value: '2',
-                            subtitle: 'Manual posting queue',
-                            icon: Icons.rocket_launch_outlined,
-                            highlightColor: const Color(0xFF10B981),
-                          ),
-                        ),
-                      ],
-                    );
+              final cards = [
+                _buildMetricCard(
+                  title: 'AWAITING MY REVIEW',
+                  value: '$awaitingReview',
+                  subtitle: 'Only you unblock these',
+                  icon: Icons.chat_bubble_outline_rounded,
+                  highlightColor: const Color(0xFF3B82F6),
+                ),
+                _buildMetricCard(
+                  title: 'AT RISK',
+                  value: '$atRisk',
+                  subtitle: 'Live in ≤2 days, not published',
+                  icon: Icons.error_outline_rounded,
+                  highlightColor: const Color(0xFFDC2626),
+                  isAlert: atRisk > 0,
+                ),
+                _buildMetricCard(
+                  title: 'WITH CLIENT >48 HRS',
+                  value: '$withClientOver48h',
+                  subtitle: 'Pending approval overdue',
+                  icon: Icons.group_outlined,
+                  highlightColor: const Color(0xFF6B7280),
+                ),
+                _buildMetricCard(
+                  title: 'TOTAL POSTS IN PIPELINE',
+                  value: '${_contents.length}',
+                  subtitle: 'Active studio items',
+                  icon: Icons.view_kanban_outlined,
+                  highlightColor: const Color(0xFF8B5CF6),
+                ),
+                _buildMetricCard(
+                  title: 'PUBLISHING NEXT 3 DAYS',
+                  value: '$publishingNext3Days',
+                  subtitle: 'Scheduled queue',
+                  icon: Icons.rocket_launch_outlined,
+                  highlightColor: const Color(0xFF10B981),
+                ),
+              ];
+
+              if (isWide) {
+                return Row(
+                  children: cards.map((c) => Expanded(child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: c,
+                  ))).toList(),
+                );
+              } else {
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: cards.map((c) => SizedBox(
+                    width: (constraints.maxWidth - 12) / 2,
+                    child: c,
+                  )).toList(),
+                );
+              }
             },
           ),
           const SizedBox(height: 24),
@@ -191,7 +219,6 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
     required IconData icon,
     required Color highlightColor,
     bool isAlert = false,
-    bool hasBadge = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -199,7 +226,7 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
         color: const Color(0xFF0F0F13),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isAlert ? const Color(0xFFDC2626).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.06),
+          color: isAlert ? const Color(0xFFDC2626).withValues(alpha: 0.35) : Colors.white.withValues(alpha: 0.06),
         ),
         gradient: isAlert
             ? const RadialGradient(
@@ -227,7 +254,7 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
                   letterSpacing: 0.5,
                 ),
               ),
-              if (isAlert || hasBadge)
+              if (isAlert)
                 Container(
                   width: 18,
                   height: 18,
@@ -235,10 +262,8 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
                     color: Color(0xFFDC2626),
                     shape: BoxShape.circle,
                   ),
-                  child: Center(
-                    child: isAlert
-                        ? const Icon(Icons.priority_high_rounded, size: 12, color: Colors.white)
-                        : const Text('!', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: const Center(
+                    child: Icon(Icons.priority_high_rounded, size: 12, color: Colors.white),
                   ),
                 )
               else
@@ -272,16 +297,11 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
   }
 
   Widget _buildContentDeadlinesCard() {
-    // Sample items matching the screenshot if DB empty
-    final displayItems = _contents.isNotEmpty
-        ? _contents.take(6).toList()
-        : [
-            {'title': 'automation', 'client': 'SUGANDHA MANDHYAN', 'month': 'SEP', 'day': '12', 'overdue': true},
-            {'title': 'carousal', 'client': 'SUGANDHA MANDHYAN', 'month': 'SEP', 'day': '25', 'overdue': true},
-            {'title': 'pocket door', 'client': 'SUGANDHA MANDHYAN', 'month': 'SEP', 'day': '9', 'overdue': true},
-            {'title': "luxury isn't a price tag", 'client': 'SUGANDHA MANDHYAN', 'month': 'SEP', 'day': '21', 'overdue': true},
-            {'title': 'OLD VS NEW', 'client': 'SUGANDHA MANDHYAN', 'month': 'SEP', 'day': '28', 'overdue': true},
-          ];
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final displayItems = _contents.take(6).toList();
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -317,7 +337,7 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
                   child: const Row(
                     children: [
                       Text(
-                        'View all',
+                        'View calendar',
                         style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF), fontWeight: FontWeight.w500),
                       ),
                       SizedBox(width: 4),
@@ -329,97 +349,163 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: displayItems.length,
-            separatorBuilder: (_, __) => Divider(color: Colors.white.withValues(alpha: 0.04), height: 24),
-            itemBuilder: (context, idx) {
-              final item = displayItems[idx];
-              final title = item['title'] ?? 'Untitled Post';
-              final client = item['client'] ?? item['client_name'] ?? 'SUGANDHA MANDHYAN';
-              final month = item['month'] ?? 'SEP';
-              final day = item['day'] ?? '${10 + idx}';
-
-              return Row(
+          if (displayItems.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 36),
+              alignment: Alignment.center,
+              child: const Column(
                 children: [
-                  // Date box
-                  Column(
-                    children: [
-                      Text(
-                        month,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFDC2626)),
-                      ),
-                      Text(
-                        day,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 18),
-                  // Title & Client
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  Icon(Icons.event_available_outlined, size: 36, color: Color(0xFF52525B)),
+                  SizedBox(height: 10),
+                  Text('No scheduled deadlines right now', style: TextStyle(color: Color(0xFF71717A), fontSize: 13)),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: displayItems.length,
+              separatorBuilder: (_, __) => Divider(color: Colors.white.withValues(alpha: 0.04), height: 24),
+              itemBuilder: (context, idx) {
+                final item = displayItems[idx];
+                final title = item['title'] ?? 'Untitled Post';
+                final client = item['client_name'] ?? item['client'] ?? 'STUDIO CLIENT';
+                final status = (item['status'] ?? '').toString().toUpperCase();
+
+                String monthStr = 'SEP';
+                String dayStr = '${idx + 1}';
+                bool isOverdue = false;
+
+                if (item['scheduled_date'] != null) {
+                  try {
+                    final dt = DateTime.parse(item['scheduled_date']).toLocal();
+                    monthStr = months[dt.month - 1];
+                    dayStr = '${dt.day}';
+                    final schedDay = DateTime(dt.year, dt.month, dt.day);
+                    if (schedDay.isBefore(today) && status != 'PUBLISHED') {
+                      isOverdue = true;
+                    }
+                  } catch (_) {}
+                }
+
+                return Row(
+                  children: [
+                    // Date box
+                    Container(
+                      width: 44,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isOverdue ? const Color(0x1ADB2727) : const Color(0xFF18181E),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isOverdue ? const Color(0x33DC2626) : Colors.white.withValues(alpha: 0.06),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          client.toString().toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF71717A),
-                            letterSpacing: 0.5,
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            monthStr,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: isOverdue ? const Color(0xFFDC2626) : const Color(0xFF9CA3AF),
+                            ),
                           ),
+                          Text(
+                            dayStr,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Title & Client
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            client.toString().toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF71717A),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Status / Overdue badge
+                    if (isOverdue)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0x22DC2626),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0x66DC2626)),
                         ),
-                      ],
-                    ),
-                  ),
-                  // Overdue badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0x22DC2626),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0x66DC2626)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.circle, size: 6, color: Color(0xFFEF4444)),
-                        SizedBox(width: 4),
-                        Text(
-                          'OVERDUE',
-                          style: TextStyle(
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.circle, size: 6, color: Color(0xFFEF4444)),
+                            SizedBox(width: 4),
+                            Text(
+                              'OVERDUE',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFEF4444),
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF181820),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        ),
+                        child: Text(
+                          status.replaceAll('_', ' '),
+                          style: const TextStyle(
                             fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFEF4444),
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF9CA3AF),
                             letterSpacing: 0.4,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+                      ),
+                  ],
+                );
+              },
+            ),
         ],
       ),
     );
   }
 
   Widget _buildActivityOverviewCard() {
+    final stats = _activityStats.isNotEmpty
+        ? _activityStats
+        : List.generate(7, (i) => {'label': 'Day ${i + 1}', 'count': 0});
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -452,7 +538,7 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
                   children: [
                     Text('Last 7 days', style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
                     SizedBox(width: 4),
-                    Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF9CA3AF)),
+                    Icon(Icons.insights_rounded, size: 14, color: Color(0xFFDC2626)),
                   ],
                 ),
               ),
@@ -465,21 +551,20 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
             height: 120,
             width: double.infinity,
             child: CustomPaint(
-              painter: _ActivityChartPainter(),
+              painter: _DynamicActivityChartPainter(
+                dataCounts: stats.map<double>((s) => ((s['count'] ?? 0) as num).toDouble()).toList(),
+              ),
             ),
           ),
           const SizedBox(height: 12),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('27 Jul', style: TextStyle(fontSize: 10, color: Color(0xFF52525B))),
-              Text('28 Jul', style: TextStyle(fontSize: 10, color: Color(0xFF52525B))),
-              Text('29 Jul', style: TextStyle(fontSize: 10, color: Color(0xFF52525B))),
-              Text('30 Jul', style: TextStyle(fontSize: 10, color: Color(0xFF52525B))),
-              Text('31 Jul', style: TextStyle(fontSize: 10, color: Color(0xFF52525B))),
-              Text('1 Aug', style: TextStyle(fontSize: 10, color: Color(0xFF52525B))),
-              Text('2 Aug', style: TextStyle(fontSize: 10, color: Color(0xFF52525B))),
-            ],
+            children: stats.map<Widget>((s) {
+              return Text(
+                s['label'] ?? '',
+                style: const TextStyle(fontSize: 10, color: Color(0xFF52525B)),
+              );
+            }).toList(),
           ),
 
           const SizedBox(height: 24),
@@ -487,29 +572,32 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
           const SizedBox(height: 18),
 
           // Latest Activity Section
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Latest Activity',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              Text(
-                'View all →',
-                style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF), fontWeight: FontWeight.w500),
-              ),
-            ],
+          const Text(
+            'Latest Activity Feed',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 14),
-          _buildActivityItem('Sugandha Mandhyan', 'uploaded creative draft for "luxury isn\'t a price tag"', '2h ago'),
-          const SizedBox(height: 10),
-          _buildActivityItem('Akash', 'approved final video for "Culture 2 — Customer..."', '5h ago'),
-          const SizedBox(height: 10),
-          _buildActivityItem('Deepjyoti Motors', 'left a review note on "Piaggio Challenge Reel"', '1d ago'),
+          if (_activities.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('No recent activity recorded yet.', style: TextStyle(fontSize: 12, color: Color(0xFF71717A))),
+            )
+          else
+            ..._activities.take(4).map((act) {
+              final user = act['user_name'] ?? 'Team Member';
+              final action = act['action'] ?? 'performed action';
+              final target = act['entity_title'] ?? '';
+              final timeStr = _formatRelativeTime(act['created_at']);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildActivityItem(user, '$action ${target.isNotEmpty ? '"$target"' : ''}', timeStr),
+              );
+            }),
         ],
       ),
     );
@@ -520,9 +608,9 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          margin: const EdgeInsets.only(top: 3),
-          width: 8,
-          height: 8,
+          margin: const EdgeInsets.only(top: 4),
+          width: 7,
+          height: 7,
           decoration: const BoxDecoration(
             color: Color(0xFFC0151C),
             shape: BoxShape.circle,
@@ -550,21 +638,28 @@ class _StudioDashboardScreenState extends State<StudioDashboardScreen> {
   }
 }
 
-class _ActivityChartPainter extends CustomPainter {
+class _DynamicActivityChartPainter extends CustomPainter {
+  final List<double> dataCounts;
+  _DynamicActivityChartPainter({required this.dataCounts});
+
   @override
   void paint(Canvas canvas, Size size) {
     final width = size.width;
     final height = size.height;
 
-    final points = [
-      Offset(0, height * 0.75),
-      Offset(width * 0.16, height * 0.70),
-      Offset(width * 0.33, height * 0.65),
-      Offset(width * 0.50, height * 0.55),
-      Offset(width * 0.66, height * 0.20), // Peak
-      Offset(width * 0.83, height * 0.70),
-      Offset(width * 1.00, height * 0.75),
-    ];
+    if (dataCounts.isEmpty) return;
+
+    final maxVal = dataCounts.fold(1.0, (prev, curr) => curr > prev ? curr : prev);
+    final count = dataCounts.length;
+    final stepX = count > 1 ? width / (count - 1) : width;
+
+    final points = <Offset>[];
+    for (int i = 0; i < count; i++) {
+      final x = i * stepX;
+      final normalized = dataCounts[i] / (maxVal > 0 ? maxVal : 1.0);
+      final y = height * 0.85 - (normalized * (height * 0.65));
+      points.add(Offset(x, y));
+    }
 
     final path = Path()..moveTo(points[0].dx, points[0].dy);
     for (int i = 0; i < points.length - 1; i++) {
@@ -602,7 +697,16 @@ class _ActivityChartPainter extends CustomPainter {
     canvas.drawPath(path, linePaint);
 
     // Peak dot highlight
-    final peakPoint = points[4];
+    int peakIndex = 0;
+    double maxCount = -1;
+    for (int i = 0; i < dataCounts.length; i++) {
+      if (dataCounts[i] > maxCount) {
+        maxCount = dataCounts[i];
+        peakIndex = i;
+      }
+    }
+
+    final peakPoint = points[peakIndex];
     final dotPaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
     final dotRingPaint = Paint()..color = const Color(0xFFEF4444)..strokeWidth = 2..style = PaintingStyle.stroke;
 
@@ -611,5 +715,7 @@ class _ActivityChartPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _DynamicActivityChartPainter oldDelegate) {
+    return oldDelegate.dataCounts != dataCounts;
+  }
 }

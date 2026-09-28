@@ -6,6 +6,12 @@ import authRoutes from './routes/auth'
 import contentRoutes from './routes/contents'
 import chatRoutes from './routes/chat'
 import clientRoutes from './routes/clients'
+import taskRoutes from './routes/tasks'
+import fileRoutes from './routes/files'
+import emailRoutes from './routes/emails'
+import trashRoutes from './routes/trash'
+import activityRoutes from './routes/activity'
+import settingsRoutes from './routes/settings'
 
 const app = new Hono()
 
@@ -31,6 +37,12 @@ app.route('/api/v1/auth', authRoutes)
 app.route('/api/v1/contents', contentRoutes)
 app.route('/api/v1/chat', chatRoutes)
 app.route('/api/v1/clients', clientRoutes)
+app.route('/api/v1/tasks', taskRoutes)
+app.route('/api/v1/files', fileRoutes)
+app.route('/api/v1/emails', emailRoutes)
+app.route('/api/v1/trash', trashRoutes)
+app.route('/api/v1/activity', activityRoutes)
+app.route('/api/v1/settings', settingsRoutes)
 
 // 404 Handler
 app.notFound((c) => {

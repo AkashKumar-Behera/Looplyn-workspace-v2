@@ -31,7 +31,7 @@ class ApiClient {
     ));
   }
 
-  // Auth Methods
+  // ================= AUTH METHODS =================
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await dio.post('/auth/login', data: {
       'email': email,
@@ -81,7 +81,7 @@ class ApiClient {
     return response.data;
   }
 
-  // Super Admin Management Methods
+  // ================= SUPER ADMIN METHODS =================
   Future<List<dynamic>> getAdmins() async {
     final response = await dio.get('/auth/admins');
     return response.data['admins'] ?? [];
@@ -110,7 +110,7 @@ class ApiClient {
     return response.data;
   }
 
-  // Client Management Methods
+  // ================= CLIENT & STAFF METHODS =================
   Future<List<dynamic>> getClients() async {
     final response = await dio.get('/clients');
     return response.data['clients'] ?? [];
@@ -131,7 +131,6 @@ class ApiClient {
     return response.data;
   }
 
-  // Staff Management Methods
   Future<List<dynamic>> getStaff() async {
     final response = await dio.get('/clients/staff');
     return response.data['staff'] ?? [];
@@ -147,7 +146,7 @@ class ApiClient {
     return response.data;
   }
 
-  // Content & Studio Methods
+  // ================= CONTENT / STUDIO METHODS =================
   Future<List<dynamic>> getContents({String? clientId, String? status, String? platform}) async {
     final response = await dio.get('/contents', queryParameters: {
       if (clientId != null) 'client_id': clientId,
@@ -167,8 +166,10 @@ class ApiClient {
     return response.data;
   }
 
-  Future<Map<String, dynamic>> deleteContent(String id) async {
-    final response = await dio.delete('/contents/$id');
+  Future<Map<String, dynamic>> deleteContent(String id, {bool permanent = false}) async {
+    final response = await dio.delete('/contents/$id', queryParameters: {
+      if (permanent) 'permanent': 'true',
+    });
     return response.data;
   }
 
@@ -192,7 +193,142 @@ class ApiClient {
     return response.data;
   }
 
-  // Chat Hub Methods
+  // ================= ACTIVITY & METRICS METHODS =================
+  Future<List<dynamic>> getActivities() async {
+    final response = await dio.get('/activity');
+    return response.data['activities'] ?? [];
+  }
+
+  Future<List<dynamic>> getActivityStats() async {
+    final response = await dio.get('/activity/stats');
+    return response.data['stats'] ?? [];
+  }
+
+  // ================= TASKS METHODS =================
+  Future<List<dynamic>> getTasks({String? clientId, String? status, String? priority}) async {
+    final response = await dio.get('/tasks', queryParameters: {
+      if (clientId != null) 'client_id': clientId,
+      if (status != null) 'status': status,
+      if (priority != null) 'priority': priority,
+    });
+    return response.data['tasks'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> createTask(Map<String, dynamic> data) async {
+    final response = await dio.post('/tasks', data: data);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateTask(String id, Map<String, dynamic> data) async {
+    final response = await dio.patch('/tasks/$id', data: data);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> deleteTask(String id, {bool permanent = false}) async {
+    final response = await dio.delete('/tasks/$id', queryParameters: {
+      if (permanent) 'permanent': 'true',
+    });
+    return response.data;
+  }
+
+  // ================= FILES & ASSET LIBRARY METHODS =================
+  Future<List<dynamic>> getFiles({String? clientId, String? category}) async {
+    final response = await dio.get('/files', queryParameters: {
+      if (clientId != null) 'client_id': clientId,
+      if (category != null) 'category': category,
+    });
+    return response.data['files'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> createFile(Map<String, dynamic> data) async {
+    final response = await dio.post('/files', data: data);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> deleteFile(String id, {bool permanent = false}) async {
+    final response = await dio.delete('/files/$id', queryParameters: {
+      if (permanent) 'permanent': 'true',
+    });
+    return response.data;
+  }
+
+  // ================= EMAIL TEMPLATES METHODS =================
+  Future<List<dynamic>> getEmailTemplates() async {
+    final response = await dio.get('/emails/templates');
+    return response.data['templates'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> createEmailTemplate(Map<String, dynamic> data) async {
+    final response = await dio.post('/emails/templates', data: data);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateEmailTemplate(String id, Map<String, dynamic> data) async {
+    final response = await dio.put('/emails/templates/$id', data: data);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> deleteEmailTemplate(String id) async {
+    final response = await dio.delete('/emails/templates/$id');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> sendTestEmail(Map<String, dynamic> data) async {
+    final response = await dio.post('/emails/send-test', data: data);
+    return response.data;
+  }
+
+  // ================= TRASH & 30-DAY RETENTION =================
+  Future<List<dynamic>> getTrashItems() async {
+    final response = await dio.get('/trash');
+    return response.data['items'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> restoreTrashItem(String type, String id) async {
+    final response = await dio.post('/trash/restore/$type/$id');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> permanentlyDeleteTrashItem(String type, String id) async {
+    final response = await dio.delete('/trash/permanent/$type/$id');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> emptyTrash() async {
+    final response = await dio.delete('/trash/empty');
+    return response.data;
+  }
+
+  // ================= WORKSPACE SETTINGS METHODS =================
+  Future<Map<String, dynamic>> getSettingsProfile() async {
+    final response = await dio.get('/settings/profile');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateSettingsProfile(Map<String, dynamic> data) async {
+    final response = await dio.put('/settings/profile', data: data);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> changeSettingsPassword(String currentPassword, String newPassword) async {
+    final response = await dio.post('/settings/change-password', data: {
+      'current_password': currentPassword,
+      'new_password': newPassword,
+    });
+    return response.data;
+  }
+
+  Future<List<dynamic>> getSettingsTeam() async {
+    final response = await dio.get('/settings/team');
+    return response.data['members'] ?? [];
+  }
+
+  // ================= CHAT HUB & DIRECT MESSAGES =================
+  Future<List<dynamic>> getChatPeers() async {
+    final response = await dio.get('/chat/eligible-peers');
+    return response.data['peers'] ?? [];
+  }
+
   Future<List<dynamic>> getChannels() async {
     final response = await dio.get('/chat/channels');
     return response.data['channels'] ?? [];
@@ -214,6 +350,18 @@ class ApiClient {
 
   Future<Map<String, dynamic>> sendMessage(String channelId, String text) async {
     final response = await dio.post('/chat/channels/$channelId/messages', data: {
+      'text': text,
+    });
+    return response.data;
+  }
+
+  Future<List<dynamic>> getDirectMessages(String peerId) async {
+    final response = await dio.get('/chat/direct/$peerId/messages');
+    return response.data['messages'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> sendDirectMessage(String peerId, String text) async {
+    final response = await dio.post('/chat/direct/$peerId/messages', data: {
       'text': text,
     });
     return response.data;

@@ -9,6 +9,7 @@ export interface UserPayload {
   role: 'super_admin' | 'admin' | 'staff' | 'client'
   name: string
   clientId?: string
+  avatarUrl?: string
 }
 
 export type AuthEnv = {
