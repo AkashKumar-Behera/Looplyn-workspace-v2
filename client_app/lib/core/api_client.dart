@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
   static const String baseUrl = String.fromEnvironment(
@@ -15,13 +15,12 @@ class ApiClient {
     },
   ));
 
-  final FlutterSecureStorage storage = const FlutterSecureStorage();
-
   ApiClient() {
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await storage.read(key: 'jwt_token');
-        if (token != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('jwt_token');
+        if (token != null && token.isNotEmpty) {
           options.headers['Authorization'] = 'Bearer $token';
         }
         return handler.next(options);
@@ -38,14 +37,21 @@ class ApiClient {
       'email': email,
       'password': password,
     });
-    if (response.data['success'] == true) {
-      await storage.write(key: 'jwt_token', value: response.data['token']);
+    if (response.data['success'] == true && response.data['token'] != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('jwt_token', response.data['token']);
     }
     return response.data;
   }
 
   Future<void> logout() async {
-    await storage.delete(key: 'jwt_token');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('jwt_token');
+  }
+
+  Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('jwt_token');
   }
 
   Future<Map<String, dynamic>> getMe() async {

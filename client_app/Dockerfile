@@ -16,8 +16,8 @@ COPY . .
 ARG API_URL=https://core.looplyn.tech/api/v1
 ENV API_URL=$API_URL
 
-# Compile optimized web bundle
-RUN flutter build web --release --dart-define=API_URL=$API_URL
+# Compile optimized web bundle (preserve all icon fonts)
+RUN flutter build web --release --no-tree-shake-icons --dart-define=API_URL=$API_URL
 
 # =============================================================
 # Stage 2: Serve via Lightweight Nginx Alpine

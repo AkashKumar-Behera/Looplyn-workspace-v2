@@ -47,7 +47,7 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<void> _checkAuthentication() async {
     try {
-      final token = await _api.storage.read(key: 'jwt_token');
+      final token = await _api.getToken();
       if (token == null || token.isEmpty) {
         if (mounted) setState(() => _isChecking = false);
         return;
