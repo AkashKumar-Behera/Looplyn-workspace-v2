@@ -5,6 +5,7 @@ import { initDB } from './db'
 import authRoutes from './routes/auth'
 import contentRoutes from './routes/contents'
 import chatRoutes from './routes/chat'
+import clientRoutes from './routes/clients'
 
 const app = new Hono()
 
@@ -29,6 +30,7 @@ app.get('/health', (c) => {
 app.route('/api/v1/auth', authRoutes)
 app.route('/api/v1/contents', contentRoutes)
 app.route('/api/v1/chat', chatRoutes)
+app.route('/api/v1/clients', clientRoutes)
 
 // 404 Handler
 app.notFound((c) => {

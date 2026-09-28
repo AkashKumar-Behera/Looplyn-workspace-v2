@@ -110,6 +110,43 @@ class ApiClient {
     return response.data;
   }
 
+  // Client Management Methods
+  Future<List<dynamic>> getClients() async {
+    final response = await dio.get('/clients');
+    return response.data['clients'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> createClient(Map<String, dynamic> data) async {
+    final response = await dio.post('/clients', data: data);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateClient(String id, Map<String, dynamic> data) async {
+    final response = await dio.patch('/clients/$id', data: data);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> deleteClient(String id) async {
+    final response = await dio.delete('/clients/$id');
+    return response.data;
+  }
+
+  // Staff Management Methods
+  Future<List<dynamic>> getStaff() async {
+    final response = await dio.get('/clients/staff');
+    return response.data['staff'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> createStaff(Map<String, dynamic> data) async {
+    final response = await dio.post('/clients/staff', data: data);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> deleteStaff(String id) async {
+    final response = await dio.delete('/clients/staff/$id');
+    return response.data;
+  }
+
   // Content & Studio Methods
   Future<List<dynamic>> getContents({String? clientId, String? status, String? platform}) async {
     final response = await dio.get('/contents', queryParameters: {
