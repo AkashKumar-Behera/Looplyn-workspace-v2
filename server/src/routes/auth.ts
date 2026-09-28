@@ -311,4 +311,120 @@ authRoutes.post('/reset-password', async (c) => {
   }
 })
 
+// -------------------------------------------------------------
+// 8. Super Admin: List All Admin Accounts
+// -------------------------------------------------------------
+authRoutes.get('/admins', authMiddleware, requireRoles('super_admin'), async (c) => {
+  try {
+    const res = await query(
+      `SELECT id, name, email, role, status, created_at, updated_at
+       FROM users
+       WHERE role = 'admin'
+       ORDER BY created_at DESC`
+    )
+    return c.json({ success: true, admins: res.rows })
+  } catch (err) {
+    console.error('Fetch admins error:', err)
+    return c.json({ success: false, error: 'Failed to fetch admin accounts' }, 500)
+  }
+})
+
+// -------------------------------------------------------------
+// 9. Super Admin: Create New Admin Account
+// -------------------------------------------------------------
+authRoutes.post('/admins', authMiddleware, requireRoles('super_admin'), async (c) => {
+  try {
+    const { name, email, password } = await c.req.json()
+
+    if (!name || !email || !password || password.length < 6) {
+      return c.json({ success: false, error: 'Name, valid email, and minimum 6-character password required' }, 400)
+    }
+
+    const cleanEmail = email.trim().toLowerCase()
+
+    // Check existing
+    const existing = await query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail])
+    if (existing.rows.length > 0) {
+      return c.json({ success: false, error: 'An account with this email already exists' }, 409)
+    }
+
+    const hashed = await bcrypt.hash(password, 10)
+    const newAdmin = await query(
+      `INSERT INTO users (name, email, password_hash, role, status)
+       VALUES ($1, $2, $3, 'admin', 'ACTIVE')
+       RETURNING id, name, email, role, status, created_at`,
+      [name.trim(), cleanEmail, hashed]
+    )
+
+    return c.json({ success: true, admin: newAdmin.rows[0] }, 201)
+  } catch (err) {
+    console.error('Create admin error:', err)
+    return c.json({ success: false, error: 'Failed to create admin account' }, 500)
+  }
+})
+
+// -------------------------------------------------------------
+// 10. Super Admin: Update Admin (Password, Status, Name)
+// -------------------------------------------------------------
+authRoutes.patch('/admins/:id', authMiddleware, requireRoles('super_admin'), async (c) => {
+  const id = c.req.param('id')
+  try {
+    const { name, status, password } = await c.req.json()
+
+    const adminCheck = await query('SELECT id, role FROM users WHERE id = $1', [id])
+    if (adminCheck.rows.length === 0) {
+      return c.json({ success: false, error: 'Admin not found' }, 404)
+    }
+
+    if (adminCheck.rows[0].role === 'super_admin') {
+      return c.json({ success: false, error: 'Super Admin account cannot be modified here' }, 403)
+    }
+
+    if (password && password.length >= 6) {
+      const hashed = await bcrypt.hash(password, 10)
+      await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashed, id])
+    }
+
+    if (status && ['ACTIVE', 'SUSPENDED'].includes(status)) {
+      await query('UPDATE users SET status = $1 WHERE id = $2', [status, id])
+    }
+
+    if (name && name.trim()) {
+      await query('UPDATE users SET name = $1 WHERE id = $2', [name.trim(), id])
+    }
+
+    await query('UPDATE users SET updated_at = NOW() WHERE id = $1', [id])
+
+    const updated = await query('SELECT id, name, email, role, status, updated_at FROM users WHERE id = $1', [id])
+    return c.json({ success: true, admin: updated.rows[0] })
+  } catch (err) {
+    console.error('Update admin error:', err)
+    return c.json({ success: false, error: 'Failed to update admin account' }, 500)
+  }
+})
+
+// -------------------------------------------------------------
+// 11. Super Admin: Delete Admin Account
+// -------------------------------------------------------------
+authRoutes.delete('/admins/:id', authMiddleware, requireRoles('super_admin'), async (c) => {
+  const id = c.req.param('id')
+  try {
+    const adminCheck = await query('SELECT id, role FROM users WHERE id = $1', [id])
+    if (adminCheck.rows.length === 0) {
+      return c.json({ success: false, error: 'Admin not found' }, 404)
+    }
+
+    if (adminCheck.rows[0].role === 'super_admin') {
+      return c.json({ success: false, error: 'Super Admin account cannot be deleted' }, 403)
+    }
+
+    await query('DELETE FROM users WHERE id = $1', [id])
+    return c.json({ success: true, message: 'Admin deleted successfully' })
+  } catch (err) {
+    console.error('Delete admin error:', err)
+    return c.json({ success: false, error: 'Failed to delete admin account' }, 500)
+  }
+})
+
 export default authRoutes
+

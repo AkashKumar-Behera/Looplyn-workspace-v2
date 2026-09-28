@@ -75,6 +75,35 @@ class ApiClient {
     return response.data;
   }
 
+  // Super Admin Management Methods
+  Future<List<dynamic>> getAdmins() async {
+    final response = await dio.get('/auth/admins');
+    return response.data['admins'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> createAdmin(String name, String email, String password) async {
+    final response = await dio.post('/auth/admins', data: {
+      'name': name,
+      'email': email,
+      'password': password,
+    });
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateAdmin(String id, {String? name, String? status, String? password}) async {
+    final response = await dio.patch('/auth/admins/$id', data: {
+      if (name != null) 'name': name,
+      if (status != null) 'status': status,
+      if (password != null) 'password': password,
+    });
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> deleteAdmin(String id) async {
+    final response = await dio.delete('/auth/admins/$id');
+    return response.data;
+  }
+
   // Content & Studio Methods
   Future<List<dynamic>> getContents({String? clientId, String? status, String? platform}) async {
     final response = await dio.get('/contents', queryParameters: {

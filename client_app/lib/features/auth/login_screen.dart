@@ -7,6 +7,7 @@ import '../../core/looplyn_logo.dart';
 import '../../core/route_transitions.dart';
 import 'reset_password_screen.dart';
 import '../studio/studio_calendar_screen.dart';
+import '../admin/super_admin_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -91,12 +92,23 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       final res = await _api.login(email, password);
       if (res['success'] == true) {
         if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          SmoothPageRoute(
-            page: const StudioCalendarScreen(),
-            direction: SlideDirection.fadeOnly,
-          ),
-        );
+        final user = res['user'];
+        final role = user != null ? user['role']?.toString() : null;
+        if (role == 'super_admin') {
+          Navigator.of(context).pushReplacement(
+            SmoothPageRoute(
+              page: const SuperAdminScreen(),
+              direction: SlideDirection.fadeOnly,
+            ),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            SmoothPageRoute(
+              page: const StudioCalendarScreen(),
+              direction: SlideDirection.fadeOnly,
+            ),
+          );
+        }
       } else {
         setState(() => _errorMessage = res['error'] ?? 'Login failed');
       }
@@ -409,78 +421,90 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           const SizedBox(height: 16),
         ],
 
-        // Email Label & Input
-        const Text(
-          'Email',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF71717A)),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          style: const TextStyle(color: Colors.white, fontSize: 13),
-          decoration: InputDecoration(
-            hintText: 'you@looplyn.tech',
-            hintStyle: const TextStyle(color: Color(0xFF3F3F46), fontSize: 13),
-            prefixIcon: const Icon(LucideIcons.mail, size: 16, color: Color(0xFF71717A)),
-            filled: true,
-            fillColor: const Color(0xFF0F0F12).withValues(alpha: 0.8),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Password Label & Input
-        const Text(
-          'Password',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF71717A)),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _passwordController,
-          obscureText: !_showPassword,
-          style: const TextStyle(color: Colors.white, fontSize: 13),
-          decoration: InputDecoration(
-            hintText: '••••••••',
-            hintStyle: const TextStyle(color: Color(0xFF3F3F46), fontSize: 13),
-            prefixIcon: const Icon(LucideIcons.lock, size: 16, color: Color(0xFF71717A)),
-            filled: true,
-            fillColor: const Color(0xFF0F0F12).withValues(alpha: 0.8),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.2),
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _showPassword ? LucideIcons.eyeOff : LucideIcons.eye,
-                size: 16,
-                color: const Color(0xFF71717A),
+        // Credentials Autofill Group
+        AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Email Label & Input
+              const Text(
+                'Email',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF71717A)),
               ),
-              onPressed: () => setState(() => _showPassword = !_showPassword),
-            ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email, AutofillHints.username],
+                textInputAction: TextInputAction.next,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'you@looplyn.tech',
+                  hintStyle: const TextStyle(color: Color(0xFF3F3F46), fontSize: 13),
+                  prefixIcon: const Icon(LucideIcons.mail, size: 16, color: Color(0xFF71717A)),
+                  filled: true,
+                  fillColor: const Color(0xFF0F0F12).withValues(alpha: 0.8),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Password Label & Input
+              const Text(
+                'Password',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF71717A)),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _passwordController,
+                obscureText: !_showPassword,
+                autofillHints: const [AutofillHints.password],
+                textInputAction: TextInputAction.done,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: '••••••••',
+                  hintStyle: const TextStyle(color: Color(0xFF3F3F46), fontSize: 13),
+                  prefixIcon: const Icon(LucideIcons.lock, size: 16, color: Color(0xFF71717A)),
+                  filled: true,
+                  fillColor: const Color(0xFF0F0F12).withValues(alpha: 0.8),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.2),
+                  ),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _showPassword ? LucideIcons.eyeOff : LucideIcons.eye,
+                      size: 16,
+                      color: const Color(0xFF71717A),
+                    ),
+                    onPressed: () => setState(() => _showPassword = !_showPassword),
+                  ),
+                ),
+                onSubmitted: (_) => _handleLogin(),
+              ),
+            ],
           ),
-          onSubmitted: (_) => _handleLogin(),
         ),
         const SizedBox(height: 10),
 
