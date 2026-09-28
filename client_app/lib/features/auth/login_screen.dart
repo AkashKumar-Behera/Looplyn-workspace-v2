@@ -6,8 +6,8 @@ import '../../core/api_client.dart';
 import '../../core/looplyn_logo.dart';
 import '../../core/route_transitions.dart';
 import 'reset_password_screen.dart';
-import '../studio/studio_calendar_screen.dart';
 import '../admin/super_admin_screen.dart';
+import '../layout/app_shell.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -104,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         } else {
           Navigator.of(context).pushReplacement(
             SmoothPageRoute(
-              page: const StudioCalendarScreen(),
+              page: const AppShell(),
               direction: SlideDirection.fadeOnly,
             ),
           );

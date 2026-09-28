@@ -114,6 +114,18 @@ authRoutes.post('/login', async (c) => {
 // 2. Get Current Authenticated Profile
 authRoutes.get('/me', authMiddleware, async (c) => {
   const tokenUser = c.get('user') as UserPayload
+  if (tokenUser.role === 'super_admin') {
+    return c.json({
+      success: true,
+      user: {
+        id: tokenUser.id,
+        email: tokenUser.email,
+        name: tokenUser.name || 'Super Admin',
+        role: 'super_admin',
+        status: 'ACTIVE'
+      }
+    })
+  }
   try {
     const res = await query('SELECT id, email, name, role, custom_role, phone, avatar_url, client_id, status FROM users WHERE id = $1', [tokenUser.id])
     if (res.rows.length === 0) {

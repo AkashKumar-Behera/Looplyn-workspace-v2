@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/api_client.dart';
 import '../../core/looplyn_logo.dart';
 import '../../core/route_transitions.dart';
@@ -33,27 +32,78 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
 
     try {
       final list = await _api.getAdmins();
-      setState(() {
-        _admins = list;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _admins = list;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load admin accounts';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load admin accounts. Please verify your connection.';
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  Future<void> _handleLogout() async {
-    await _api.logout();
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      SmoothPageRoute(
-        page: const LoginScreen(),
-        direction: SlideDirection.leftToRight,
+  Future<void> _toggleAdminStatus(String adminId, String currentStatus, String adminName) async {
+    final newStatus = currentStatus == 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    final actionName = newStatus == 'ACTIVE' ? 'reactivate' : 'suspend';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF111116),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        title: Text('Confirm $actionName', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+        content: Text(
+          'Are you sure you want to $actionName admin account for $adminName?',
+          style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF71717A))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: newStatus == 'ACTIVE' ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(newStatus == 'ACTIVE' ? 'Reactivate' : 'Suspend'),
+          ),
+        ],
       ),
     );
+
+    if (confirmed != true) return;
+
+    try {
+      final res = await _api.updateAdmin(adminId, status: newStatus);
+      if (res['success'] == true) {
+        _fetchAdmins();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Admin $adminName is now $newStatus'),
+              backgroundColor: newStatus == 'ACTIVE' ? const Color(0xFF059669) : const Color(0xFFD97706),
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update admin status'), backgroundColor: Color(0xFFDC2626)),
+        );
+      }
+    }
   }
 
   void _showCreateAdminDialog() {
@@ -73,15 +123,9 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
             ),
-            title: const Row(
-              children: [
-                Icon(LucideIcons.userPlus, size: 20, color: Color(0xFFDC2626)),
-                SizedBox(width: 10),
-                Text('Create Admin Account', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-              ],
-            ),
+            title: const Text('Register New Admin', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
             content: SizedBox(
-              width: 400,
+              width: 380,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,40 +142,35 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                     ),
                     const SizedBox(height: 14),
                   ],
-                  const Text('Full Name', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12, fontWeight: FontWeight.w500)),
+                  const Text('Full Name', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: nameCtrl,
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
-                      hintText: 'e.g. John Doe',
-                      hintStyle: const TextStyle(color: Color(0xFF4B5563), fontSize: 13),
+                      hintText: 'e.g. Akash Kumar',
                       filled: true,
                       fillColor: const Color(0xFF09090C),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text('Email Address', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12, fontWeight: FontWeight.w500)),
+                  const Text('Email Address', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
                       hintText: 'admin@looplyn.tech',
-                      hintStyle: const TextStyle(color: Color(0xFF4B5563), fontSize: 13),
                       filled: true,
                       fillColor: const Color(0xFF09090C),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text('Password (Min 6 chars)', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12, fontWeight: FontWeight.w500)),
+                  const Text('Initial Password (Min 6 chars)', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: passCtrl,
@@ -139,12 +178,10 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
                       hintText: '••••••••',
-                      hintStyle: const TextStyle(color: Color(0xFF4B5563), fontSize: 13),
                       filled: true,
                       fillColor: const Color(0xFF09090C),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
                     ),
                   ),
                 ],
@@ -152,14 +189,14 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF9CA3AF))),
+                onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
+                child: const Text('Cancel', style: TextStyle(color: Color(0xFF71717A))),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDC2626),
+                  backgroundColor: const Color(0xFFC0151C),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 ),
                 onPressed: isSubmitting
                     ? null
@@ -184,16 +221,13 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                             if (!context.mounted) return;
                             Navigator.of(context).pop();
                             _fetchAdmins();
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(content: Text('Admin $name created successfully!'), backgroundColor: const Color(0xFF059669)),
-                            );
                           } else {
                             setDialogState(() {
                               dialogError = res['error'] ?? 'Failed to create admin';
                               isSubmitting = false;
                             });
                           }
-                        } catch (err) {
+                        } catch (_) {
                           setDialogState(() {
                             dialogError = 'Error creating admin';
                             isSubmitting = false;
@@ -257,7 +291,6 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                       fillColor: const Color(0xFF09090C),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
                     ),
                   ),
                 ],
@@ -265,20 +298,19 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF9CA3AF))),
+                onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
+                child: const Text('Cancel', style: TextStyle(color: Color(0xFF71717A))),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDC2626),
+                  backgroundColor: const Color(0xFFC0151C),
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: isSubmitting
                     ? null
                     : () async {
-                        final newPass = passCtrl.text.trim();
-                        if (newPass.length < 6) {
+                        final pass = passCtrl.text.trim();
+                        if (pass.length < 6) {
                           setDialogState(() => dialogError = 'Password must be at least 6 characters');
                           return;
                         }
@@ -289,20 +321,17 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                         });
 
                         try {
-                          final res = await _api.updateAdmin(adminId, password: newPass);
+                          final res = await _api.updateAdmin(adminId, password: pass);
                           if (res['success'] == true) {
                             if (!context.mounted) return;
                             Navigator.of(context).pop();
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(content: Text('Password updated for $adminName'), backgroundColor: const Color(0xFF059669)),
-                            );
                           } else {
                             setDialogState(() {
                               dialogError = res['error'] ?? 'Failed to update password';
                               isSubmitting = false;
                             });
                           }
-                        } catch (err) {
+                        } catch (_) {
                           setDialogState(() {
                             dialogError = 'Error updating password';
                             isSubmitting = false;
@@ -320,28 +349,8 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
     );
   }
 
-  void _toggleAdminStatus(String adminId, String currentStatus, String adminName) async {
-    final nextStatus = currentStatus == 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
-    try {
-      final res = await _api.updateAdmin(adminId, status: nextStatus);
-      if (res['success'] == true) {
-        _fetchAdmins();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$adminName is now $nextStatus'),
-            backgroundColor: nextStatus == 'ACTIVE' ? const Color(0xFF059669) : const Color(0xFFD97706),
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update status'), backgroundColor: Color(0xFFEF4444)),
-      );
-    }
-  }
-
-  void _confirmDeleteAdmin(String adminId, String adminName) {
-    showDialog(
+  void _confirmDeleteAdmin(String adminId, String adminName) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF111116),
@@ -349,41 +358,45 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
-        title: Text('Delete $adminName?', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
-        content: const Text(
-          'Are you sure you want to delete this Admin account? This action cannot be undone.',
-          style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+        title: const Text('Delete Admin Account', style: TextStyle(color: Color(0xFFEF4444), fontSize: 18, fontWeight: FontWeight.w700)),
+        content: Text(
+          'Are you sure you want to permanently delete the admin account for "$adminName"? This action cannot be undone.',
+          style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF9CA3AF))),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF71717A))),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFDC2626),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              try {
-                final res = await _api.deleteAdmin(adminId);
-                if (res['success'] == true) {
-                  _fetchAdmins();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Admin $adminName deleted successfully'), backgroundColor: const Color(0xFF059669)),
-                  );
-                }
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Failed to delete admin'), backgroundColor: Color(0xFFEF4444)),
-                );
-              }
-            },
-            child: const Text('Delete Account'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete Admin'),
           ),
         ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final res = await _api.deleteAdmin(adminId);
+      if (res['success'] == true) {
+        _fetchAdmins();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _handleLogout() async {
+    await _api.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      SmoothPageRoute(
+        page: const LoginScreen(),
+        direction: SlideDirection.fadeOnly,
       ),
     );
   }
@@ -393,15 +406,15 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
     final filteredAdmins = _admins.where((a) {
       final name = (a['name'] ?? '').toString().toLowerCase();
       final email = (a['email'] ?? '').toString().toLowerCase();
-      final query = _searchQuery.toLowerCase();
-      return name.contains(query) || email.contains(query);
+      final q = _searchQuery.toLowerCase();
+      return name.contains(q) || email.contains(q);
     }).toList();
 
     final activeCount = _admins.where((a) => a['status'] == 'ACTIVE').length;
     final suspendedCount = _admins.where((a) => a['status'] == 'SUSPENDED').length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF09090C),
+      backgroundColor: const Color(0xFF070709),
       body: SafeArea(
         child: Column(
           children: [
@@ -445,7 +458,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                   ),
                   const SizedBox(width: 16),
                   IconButton(
-                    icon: const Icon(LucideIcons.logOut, size: 18, color: Color(0xFFEF4444)),
+                    icon: const Icon(Icons.logout_rounded, size: 18, color: Color(0xFFEF4444)),
                     tooltip: 'Sign out',
                     onPressed: _handleLogout,
                   ),
@@ -489,7 +502,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
                               onPressed: _showCreateAdminDialog,
-                              icon: const Icon(LucideIcons.userPlus, size: 16),
+                              icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
                               label: const Text('Add Admin', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                             ),
                           ],
@@ -499,11 +512,11 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                         // Stats Metric Cards
                         Row(
                           children: [
-                            _buildStatCard('Total Admins', '${_admins.length}', LucideIcons.users, const Color(0xFF3B82F6)),
+                            _buildStatCard('Total Admins', '${_admins.length}', Icons.group_outlined, const Color(0xFF3B82F6)),
                             const SizedBox(width: 16),
-                            _buildStatCard('Active Admins', '$activeCount', LucideIcons.userCheck, const Color(0xFF10B981)),
+                            _buildStatCard('Active Admins', '$activeCount', Icons.check_circle_outline_rounded, const Color(0xFF10B981)),
                             const SizedBox(width: 16),
-                            _buildStatCard('Suspended', '$suspendedCount', LucideIcons.userX, const Color(0xFFF59E0B)),
+                            _buildStatCard('Suspended', '$suspendedCount', Icons.block_outlined, const Color(0xFFF59E0B)),
                           ],
                         ),
                         const SizedBox(height: 28),
@@ -520,7 +533,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                             onChanged: (val) => setState(() => _searchQuery = val),
                             style: const TextStyle(color: Colors.white, fontSize: 13),
                             decoration: const InputDecoration(
-                              icon: Icon(LucideIcons.search, size: 16, color: Color(0xFF71717A)),
+                              icon: Icon(Icons.search_rounded, size: 16, color: Color(0xFF71717A)),
                               hintText: 'Search admin by name or email...',
                               hintStyle: TextStyle(color: Color(0xFF4B5563), fontSize: 13),
                               border: InputBorder.none,
@@ -550,7 +563,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                             ),
                             child: Column(
                               children: [
-                                const Icon(LucideIcons.users, size: 36, color: Color(0xFF4B5563)),
+                                const Icon(Icons.people_outline_rounded, size: 36, color: Color(0xFF4B5563)),
                                 const SizedBox(height: 12),
                                 const Text('No Admin Accounts Found', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
                                 const SizedBox(height: 4),
@@ -559,7 +572,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                                 ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
                                   onPressed: _showCreateAdminDialog,
-                                  icon: const Icon(LucideIcons.userPlus, size: 15),
+                                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 15),
                                   label: const Text('Create Admin'),
                                 ),
                               ],
@@ -632,28 +645,72 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 24),
+                                      const SizedBox(width: 20),
 
-                                      // Actions
+                                      // Explicit Action Buttons
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          IconButton(
-                                            icon: const Icon(LucideIcons.keyRound, size: 16, color: Color(0xFF9CA3AF)),
-                                            tooltip: 'Change Password',
-                                            onPressed: () => _showChangePasswordDialog(id, name),
-                                          ),
-                                          IconButton(
-                                            icon: Icon(
-                                              isActive ? LucideIcons.pauseCircle : LucideIcons.playCircle,
-                                              size: 16,
-                                              color: isActive ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                                          // Reset Password Action Chip
+                                          InkWell(
+                                            borderRadius: BorderRadius.circular(6),
+                                            onTap: () => _showChangePasswordDialog(id, name),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF1A1A22),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                                              ),
+                                              child: const Row(
+                                                children: [
+                                                  Icon(Icons.vpn_key_rounded, size: 13, color: Color(0xFF9CA3AF)),
+                                                  SizedBox(width: 6),
+                                                  Text('Password', style: TextStyle(fontSize: 11, color: Color(0xFFD1D5DB), fontWeight: FontWeight.w500)),
+                                                ],
+                                              ),
                                             ),
-                                            tooltip: isActive ? 'Suspend Account' : 'Reactivate Account',
-                                            onPressed: () => _toggleAdminStatus(id, status, name),
                                           ),
+                                          const SizedBox(width: 8),
+
+                                          // Suspend/Reactivate Action Chip
+                                          InkWell(
+                                            borderRadius: BorderRadius.circular(6),
+                                            onTap: () => _toggleAdminStatus(id, status, name),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                              decoration: BoxDecoration(
+                                                color: isActive ? const Color(0x1AF59E0B) : const Color(0x1A10B981),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: isActive ? const Color(0x4DF59E0B) : const Color(0x4D10B981),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    isActive ? Icons.pause_circle_outline_rounded : Icons.play_circle_outline_rounded,
+                                                    size: 13,
+                                                    color: isActive ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    isActive ? 'Suspend' : 'Activate',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: isActive ? const Color(0xFFFBBF24) : const Color(0xFF34D399),
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+
+                                          // Delete Button
                                           IconButton(
-                                            icon: const Icon(LucideIcons.trash2, size: 16, color: Color(0xFFEF4444)),
+                                            icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFEF4444)),
                                             tooltip: 'Delete Admin',
                                             onPressed: () => _confirmDeleteAdmin(id, name),
                                           ),
@@ -678,7 +735,7 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
     );
   }
 
-  Widget _buildStatCard(String label, String count, IconData icon, Color color) {
+  Widget _buildStatCard(String title, String count, IconData icon, Color color) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(20),
@@ -690,19 +747,26 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: color, size: 20),
+              child: Icon(icon, color: color, size: 22),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 16),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(count, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white)),
-                Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF71717A))),
+                Text(
+                  count,
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF71717A), fontWeight: FontWeight.w500),
+                ),
               ],
             ),
           ],

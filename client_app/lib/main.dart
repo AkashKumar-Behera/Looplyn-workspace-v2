@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'core/api_client.dart';
 import 'core/theme.dart';
+import 'features/admin/super_admin_screen.dart';
 import 'features/auth/login_screen.dart';
+import 'features/client/client_review_screen.dart';
+import 'features/layout/app_shell.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +22,70 @@ class LooplynApp extends StatelessWidget {
       themeMode: ThemeMode.dark,
       theme: AppTheme.darkTheme,
       darkTheme: AppTheme.darkTheme,
-      home: const LoginScreen(),
+      home: const AuthGate(),
     );
+  }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  final _api = ApiClient();
+  bool _isChecking = true;
+  Widget _targetScreen = const LoginScreen();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthentication();
+  }
+
+  Future<void> _checkAuthentication() async {
+    try {
+      final token = await _api.storage.read(key: 'jwt_token');
+      if (token == null || token.isEmpty) {
+        if (mounted) setState(() => _isChecking = false);
+        return;
+      }
+
+      final res = await _api.getMe();
+      if (res['success'] == true && res['user'] != null) {
+        final role = res['user']['role']?.toString();
+        if (role == 'super_admin') {
+          _targetScreen = const SuperAdminScreen();
+        } else if (role == 'client') {
+          _targetScreen = const ClientReviewScreen();
+        } else {
+          _targetScreen = const AppShell();
+        }
+      } else {
+        await _api.logout();
+        _targetScreen = const LoginScreen();
+      }
+    } catch (_) {
+      _targetScreen = const LoginScreen();
+    } finally {
+      if (mounted) {
+        setState(() => _isChecking = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isChecking) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF070709),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFC0151C)),
+        ),
+      );
+    }
+    return _targetScreen;
   }
 }

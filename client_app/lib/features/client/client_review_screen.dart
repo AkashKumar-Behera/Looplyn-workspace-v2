@@ -4,8 +4,8 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 
 class ClientReviewScreen extends StatefulWidget {
-  final Map<String, dynamic> contentItem;
-  const ClientReviewScreen({super.key, required this.contentItem});
+  final Map<String, dynamic>? contentItem;
+  const ClientReviewScreen({super.key, this.contentItem});
 
   @override
   State<ClientReviewScreen> createState() => _ClientReviewScreenState();
@@ -18,17 +18,26 @@ class _ClientReviewScreenState extends State<ClientReviewScreen> {
   bool _isLoadingComments = true;
   bool _isActionLoading = false;
   late String _currentStatus;
+  late Map<String, dynamic> _item;
 
   @override
   void initState() {
     super.initState();
-    _currentStatus = widget.contentItem['status'] ?? 'IDEA';
+    _item = widget.contentItem ?? {
+      'id': 'sample-1',
+      'title': 'Diwali Campaign Reel Draft',
+      'description': 'Festive promo highlighting premium offer hooks and brand identity.',
+      'platform': 'INSTAGRAM',
+      'format': 'REEL',
+      'status': 'IN_REVIEW',
+    };
+    _currentStatus = _item['status'] ?? 'IN_REVIEW';
     _loadComments();
   }
 
   Future<void> _loadComments() async {
     try {
-      final data = await _api.getComments(widget.contentItem['id']);
+      final data = await _api.getComments(_item['id']);
       if (mounted) {
         setState(() {
           _comments = data;
@@ -43,7 +52,7 @@ class _ClientReviewScreenState extends State<ClientReviewScreen> {
   Future<void> _handleApprove() async {
     setState(() => _isActionLoading = true);
     try {
-      final res = await _api.approveContent(widget.contentItem['id']);
+      final res = await _api.approveContent(_item['id']);
       if (res['success'] == true) {
         setState(() => _currentStatus = 'APPROVED');
         if (!mounted) return;
@@ -100,7 +109,7 @@ class _ClientReviewScreenState extends State<ClientReviewScreen> {
               Navigator.of(ctx).pop();
               setState(() => _isActionLoading = true);
               try {
-                await _api.requestChanges(widget.contentItem['id'], text);
+                await _api.requestChanges(_item['id'], text);
                 setState(() => _currentStatus = 'IN_PROGRESS');
                 _loadComments();
               } finally {
@@ -120,7 +129,7 @@ class _ClientReviewScreenState extends State<ClientReviewScreen> {
 
     _commentController.clear();
     try {
-      await _api.addComment(widget.contentItem['id'], text);
+      await _api.addComment(_item['id'], text);
       _loadComments();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -142,7 +151,7 @@ class _ClientReviewScreenState extends State<ClientReviewScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          widget.contentItem['title'] ?? 'Review Content',
+          _item['title'] ?? 'Review Content',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
         ),
         actions: [
@@ -150,9 +159,9 @@ class _ClientReviewScreenState extends State<ClientReviewScreen> {
             margin: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: isApproved ? AppTheme.success.withOpacity(0.15) : AppTheme.warning.withOpacity(0.15),
+              color: isApproved ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.warning.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: isApproved ? AppTheme.success.withOpacity(0.4) : AppTheme.warning.withOpacity(0.4)),
+              border: Border.all(color: isApproved ? AppTheme.success.withValues(alpha: 0.4) : AppTheme.warning.withValues(alpha: 0.4)),
             ),
             child: Center(
               child: Text(
@@ -193,7 +202,7 @@ class _ClientReviewScreenState extends State<ClientReviewScreen> {
                           const Icon(LucideIcons.playCircle, size: 54, color: AppTheme.accent),
                           const SizedBox(height: 12),
                           Text(
-                            widget.contentItem['platform'] ?? 'INSTAGRAM REEL',
+                            _item['platform'] ?? 'INSTAGRAM REEL',
                             style: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                           const SizedBox(height: 4),
@@ -219,7 +228,7 @@ class _ClientReviewScreenState extends State<ClientReviewScreen> {
                       border: Border.all(color: AppTheme.surfaceLight),
                     ),
                     child: Text(
-                      widget.contentItem['description'] ?? 'No caption added yet.',
+                      _item['description'] ?? 'No caption added yet.',
                       style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.5),
                     ),
                   ),
